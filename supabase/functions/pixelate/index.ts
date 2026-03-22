@@ -25,7 +25,7 @@ serve(async (req) => {
       });
     }
 
-    // Create prediction using rd-fast with image input
+    // Use retro-diffusion/rd-fast with correct version and field names
     const createRes = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -34,12 +34,12 @@ serve(async (req) => {
         Prefer: "wait",
       },
       body: JSON.stringify({
-        version: "3a12e487297b34b89a2f10705e56f41f4a18bd20bd38b04566381408e4e79e43",
+        version: "770bae20fa595eafcfb17216e83182c828f07c167fc0dd26193cf4c2323cc8d4",
         input: {
-          image: imageBase64,
+          input_image: imageBase64,
           style: "portrait",
-          width: 128,
-          height: 128,
+          width: 256,
+          height: 256,
           prompt: "pixel art portrait, retro game character, detailed pixel art",
           strength: 0.65,
           num_images: 1,
@@ -49,90 +49,30 @@ serve(async (req) => {
 
     if (!createRes.ok) {
       const errText = await createRes.text();
-      console.error("Replicate create error:", createRes.status, errText);
-      
-      // If "wait" didn't work, poll instead
-      if (createRes.status === 400 || createRes.status === 422) {
-        // Try without Prefer: wait
-        const createRes2 = await fetch("https://api.replicate.com/v1/predictions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${REPLICATE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            version: "3a12e487297b34b89a2f10705e56f41f4a18bd20bd38b04566381408e4e79e43",
-            input: {
-              image: imageBase64,
-              style: "portrait",
-              width: 128,
-              height: 128,
-              prompt: "pixel art portrait, retro game character, detailed pixel art",
-              strength: 0.65,
-              num_images: 1,
-            },
-          }),
-        });
-
-        if (!createRes2.ok) {
-          const errText2 = await createRes2.text();
-          throw new Error(`Replicate API error [${createRes2.status}]: ${errText2}`);
-        }
-
-        const prediction = await createRes2.json();
-        
-        // Poll for result
-        let result = prediction;
-        let attempts = 0;
-        while (result.status !== "succeeded" && result.status !== "failed" && attempts < 60) {
-          await new Promise((r) => setTimeout(r, 2000));
-          const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${result.id}`, {
-            headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` },
-          });
-          result = await pollRes.json();
-          attempts++;
-        }
-
-        if (result.status === "failed") {
-          throw new Error(`Prediction failed: ${result.error}`);
-        }
-
-        const outputUrl = Array.isArray(result.output) ? result.output[0] : result.output;
-        return new Response(JSON.stringify({ imageUrl: outputUrl }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      
+      console.error("Replicate error:", createRes.status, errText);
       throw new Error(`Replicate API error [${createRes.status}]: ${errText}`);
     }
 
-    const prediction = await createRes.json();
-
-    // If prediction completed with Prefer: wait
-    if (prediction.status === "succeeded") {
-      const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-      return new Response(JSON.stringify({ imageUrl: outputUrl }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    let prediction = await createRes.json();
 
     // Poll if not done yet
-    let result = prediction;
     let attempts = 0;
-    while (result.status !== "succeeded" && result.status !== "failed" && attempts < 60) {
+    while (prediction.status !== "succeeded" && prediction.status !== "failed" && attempts < 60) {
       await new Promise((r) => setTimeout(r, 2000));
-      const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${result.id}`, {
+      const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
         headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` },
       });
-      result = await pollRes.json();
+      prediction = await pollRes.json();
       attempts++;
     }
 
-    if (result.status === "failed") {
-      throw new Error(`Prediction failed: ${result.error}`);
+    if (prediction.status === "failed") {
+      throw new Error(`Prediction failed: ${prediction.error}`);
     }
 
-    const outputUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+    const output = prediction.output;
+    const outputUrl = Array.isArray(output) ? output[0] : output;
+
     return new Response(JSON.stringify({ imageUrl: outputUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
