@@ -1,88 +1,84 @@
 import { useRef, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const PfpMaker = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hasImage, setHasImage] = useState(false);
-  const [pixelSize, setPixelSize] = useState(8);
-  const [originalImage, setOriginalImage] = useState<HTMLImageElement | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [originalPreview, setOriginalPreview] = useState<string | null>(null);
 
-  const pixelate = useCallback((img: HTMLImageElement, size: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const processImage = useCallback(async (file: File) => {
+    setIsProcessing(true);
+    setResultUrl(null);
 
-    const outputSize = 512;
-    canvas.width = outputSize;
-    canvas.height = outputSize;
+    // Create preview
+    const previewUrl = URL.createObjectURL(file);
+    setOriginalPreview(previewUrl);
+    setHasImage(true);
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    try {
+      // Convert to base64 data URI
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
-    const gridCount = Math.floor(outputSize / size);
-    const blockSize = size;
+      toast.info("🎨 AI is pixelating your image...");
 
-    // Offscreen: draw source image cropped to square at grid resolution
-    const offscreen = document.createElement("canvas");
-    offscreen.width = gridCount;
-    offscreen.height = gridCount;
-    const offCtx = offscreen.getContext("2d");
-    if (!offCtx) return;
+      const { data, error } = await supabase.functions.invoke("pixelate", {
+        body: { imageBase64: base64 },
+      });
 
-    // Crop to square from center
-    const cropSize = Math.min(img.width, img.height);
-    const sx = (img.width - cropSize) / 2;
-    const sy = (img.height - cropSize) / 2;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-    // Use smoothing on downsample for good color averaging
-    offCtx.imageSmoothingEnabled = true;
-    offCtx.imageSmoothingQuality = "high";
-    offCtx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, gridCount, gridCount);
+      if (data?.imageUrl) {
+        setResultUrl(data.imageUrl);
 
-    // Read pixel data and draw crisp blocks
-    const imageData = offCtx.getImageData(0, 0, gridCount, gridCount);
-    const data = imageData.data;
+        // Draw result to canvas
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return;
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(img, 0, 0);
+        };
+        img.src = data.imageUrl;
 
-    ctx.clearRect(0, 0, outputSize, outputSize);
-    
-    for (let y = 0; y < gridCount; y++) {
-      for (let x = 0; x < gridCount; x++) {
-        const i = (y * gridCount + x) * 4;
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
-        ctx.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);
+        toast.success("✅ Pixelization complete!");
       }
+    } catch (err: any) {
+      console.error("Pixelate error:", err);
+      toast.error(err.message || "Failed to pixelate image");
+    } finally {
+      setIsProcessing(false);
     }
   }, []);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const img = new Image();
-    img.onload = () => {
-      setOriginalImage(img);
-      setHasImage(true);
-      pixelate(img, pixelSize);
-    };
-    img.src = URL.createObjectURL(file);
-  };
-
-  const handlePixelSizeChange = (newSize: number) => {
-    setPixelSize(newSize);
-    if (originalImage) {
-      pixelate(originalImage, newSize);
-    }
+    processImage(file);
   };
 
   const download = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const link = document.createElement("a");
-    link.download = "pixelized-pfp.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    if (resultUrl) {
+      const link = document.createElement("a");
+      link.download = "pixelized-pfp.png";
+      link.href = resultUrl;
+      link.target = "_blank";
+      link.click();
+    }
   };
 
   return (
@@ -92,7 +88,7 @@ const PfpMaker = () => {
           PFP MAKER
         </h2>
         <p className="font-pixel text-muted-foreground text-sm mb-8">
-          Upload your image. Get pixelized. Join the movement.
+          Upload your image. AI will transform it into pixel art. Join the movement.
         </p>
 
         <div className="bg-card pixel-border p-6 md:p-8">
@@ -117,36 +113,58 @@ const PfpMaker = () => {
             className="hidden"
           />
 
-          {/* Canvas preview */}
-          {hasImage && (
+          {/* Processing state */}
+          {hasImage && isProcessing && (
             <div className="space-y-6">
-              <canvas
-                ref={canvasRef}
-                className="mx-auto pixel-border max-w-full"
-                style={{ width: "320px", height: "320px" }}
-              />
-
-              {/* Pixel size control */}
-              <div className="flex items-center justify-center gap-4">
-                <span className="font-pixel text-xs text-muted-foreground">PIXEL SIZE</span>
+              {originalPreview && (
+                <img
+                  src={originalPreview}
+                  alt="Original"
+                  className="mx-auto pixel-border max-w-full"
+                  style={{ width: "320px", height: "320px", objectFit: "cover" }}
+                />
+              )}
+              <div className="flex flex-col items-center gap-3">
                 <div className="flex gap-2">
-                  {[4, 8, 12, 16, 24].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => handlePixelSizeChange(s)}
-                      className={`font-pixel text-xs px-3 py-1.5 pixel-btn ${
-                        pixelSize === s
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {s}px
-                    </button>
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-4 h-4 bg-primary pixel-blink"
+                      style={{ animationDelay: `${i * 0.2}s` }}
+                    />
                   ))}
+                </div>
+                <p className="font-pixel text-primary text-sm">AI IS PIXELATING...</p>
+                <p className="font-pixel text-muted-foreground text-xs">THIS MAY TAKE 15-30 SECONDS</p>
+              </div>
+            </div>
+          )}
+
+          {/* Result */}
+          {hasImage && !isProcessing && resultUrl && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {originalPreview && (
+                  <div>
+                    <p className="font-pixel text-muted-foreground text-xs mb-2">ORIGINAL</p>
+                    <img
+                      src={originalPreview}
+                      alt="Original"
+                      className="mx-auto pixel-border w-full"
+                      style={{ maxWidth: "256px", aspectRatio: "1", objectFit: "cover" }}
+                    />
+                  </div>
+                )}
+                <div>
+                  <p className="font-pixel text-primary text-xs mb-2">PIXELIZED ✨</p>
+                  <canvas
+                    ref={canvasRef}
+                    className="mx-auto pixel-border w-full"
+                    style={{ maxWidth: "256px", imageRendering: "pixelated" }}
+                  />
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-4 justify-center flex-wrap">
                 <button
                   onClick={download}
@@ -157,7 +175,8 @@ const PfpMaker = () => {
                 <button
                   onClick={() => {
                     setHasImage(false);
-                    setOriginalImage(null);
+                    setResultUrl(null);
+                    setOriginalPreview(null);
                     if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
                   className="font-pixel bg-muted text-muted-foreground px-6 py-3 pixel-btn text-sm"
@@ -165,6 +184,23 @@ const PfpMaker = () => {
                   ↻ NEW IMAGE
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Error state - has image but no result and not processing */}
+          {hasImage && !isProcessing && !resultUrl && (
+            <div className="space-y-4">
+              <p className="font-pixel text-accent text-sm">SOMETHING WENT WRONG</p>
+              <button
+                onClick={() => {
+                  setHasImage(false);
+                  setOriginalPreview(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="font-pixel bg-muted text-muted-foreground px-6 py-3 pixel-btn text-sm"
+              >
+                ↻ TRY AGAIN
+              </button>
             </div>
           )}
         </div>
