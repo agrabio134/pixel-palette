@@ -1,16 +1,34 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import PixelNav from "@/components/PixelNav";
+import HeroSection from "@/components/HeroSection";
+import LoreSection from "@/components/LoreSection";
+import PfpMaker from "@/components/PfpMaker";
+import ChartSection from "@/components/ChartSection";
+import Footer from "@/components/Footer";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      <PixelNav />
+
+      {/* Ticker marquee */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-primary py-1 overflow-hidden">
+        <div className="pixel-marquee whitespace-nowrap font-screen text-primary-foreground text-xs">
+          $PIXEL · PIXELIZATION · THE ORIGIN TOKEN · REDISCOVER THE BEGINNING · 
+          $PIXEL · PIXELIZATION · THE ORIGIN TOKEN · REDISCOVER THE BEGINNING · 
+          $PIXEL · PIXELIZATION · THE ORIGIN TOKEN · REDISCOVER THE BEGINNING
+        </div>
+      </div>
+
+      <HeroSection />
+      <LoreSection />
+      <PfpMaker />
+      <ChartSection />
+      <Footer />
+
+      {/* Bottom spacer for marquee */}
+      <div className="h-8" />
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
