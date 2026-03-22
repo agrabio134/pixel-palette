@@ -18,14 +18,13 @@ const PfpMaker = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Draw image scaled down
-    const smallW = Math.ceil(outputSize / size);
-    const smallH = Math.ceil(outputSize / size);
+    const gridCount = Math.floor(outputSize / size);
+    const blockSize = size;
 
-    // Create offscreen canvas for downscale
+    // Offscreen: draw source image cropped to square at grid resolution
     const offscreen = document.createElement("canvas");
-    offscreen.width = smallW;
-    offscreen.height = smallH;
+    offscreen.width = gridCount;
+    offscreen.height = gridCount;
     const offCtx = offscreen.getContext("2d");
     if (!offCtx) return;
 
@@ -34,12 +33,27 @@ const PfpMaker = () => {
     const sx = (img.width - cropSize) / 2;
     const sy = (img.height - cropSize) / 2;
 
-    offCtx.imageSmoothingEnabled = false;
-    offCtx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, smallW, smallH);
+    // Use smoothing on downsample for good color averaging
+    offCtx.imageSmoothingEnabled = true;
+    offCtx.imageSmoothingQuality = "high";
+    offCtx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, gridCount, gridCount);
 
-    // Draw scaled up with no smoothing
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(offscreen, 0, 0, smallW, smallH, 0, 0, outputSize, outputSize);
+    // Read pixel data and draw crisp blocks
+    const imageData = offCtx.getImageData(0, 0, gridCount, gridCount);
+    const data = imageData.data;
+
+    ctx.clearRect(0, 0, outputSize, outputSize);
+    
+    for (let y = 0; y < gridCount; y++) {
+      for (let x = 0; x < gridCount; x++) {
+        const i = (y * gridCount + x) * 4;
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);
+      }
+    }
   }, []);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
