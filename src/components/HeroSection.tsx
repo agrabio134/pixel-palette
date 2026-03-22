@@ -18,7 +18,7 @@ const HeroSection = () => {
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center pt-20 pb-12 px-4 overflow-hidden">
       {/* Background grid pattern */}
-      <div className="absolute inset-0 opacity-5" style={{
+      <div className="absolute inset-0 opacity-5 pointer-events-none" style={{
         backgroundImage: `repeating-linear-gradient(0deg, hsl(42 100% 50%) 0px, transparent 1px, transparent 32px),
                           repeating-linear-gradient(90deg, hsl(42 100% 50%) 0px, transparent 1px, transparent 32px)`
       }} />
