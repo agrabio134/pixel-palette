@@ -71,13 +71,20 @@ const PfpMaker = () => {
     processImage(file);
   };
 
-  const download = () => {
-    if (resultUrl) {
+  const download = async () => {
+    if (!resultUrl) return;
+    try {
+      const response = await fetch(resultUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.download = "pixelized-pfp.png";
-      link.href = resultUrl;
-      link.target = "_blank";
+      link.href = blobUrl;
       link.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // Fallback: open in new tab
+      window.open(resultUrl, "_blank");
     }
   };
 
