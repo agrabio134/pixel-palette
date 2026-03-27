@@ -15,9 +15,7 @@ const LoreSection = () => {
             </div>
 
             <p className="text-foreground">
-              Pixelization is the <span className="text-primary">first token</span> deployed by the{" "}
-              <span className="text-pixel-sky font-screen">CHIBI</span>{" "}
-              <span className="text-muted-foreground">· $3.19</span> developer.
+              Pixelization is the <span className="text-primary">first token</span> — the origin of everything that came after.
             </p>
 
             <p className="text-foreground">

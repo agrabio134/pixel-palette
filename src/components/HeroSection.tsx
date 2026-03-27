@@ -1,5 +1,5 @@
 import bannerImg from "@/assets/pixelization-banner.png";
-import pfpImg from "@/assets/pixelization-pfp.png";
+import pfpImg from "@/assets/pixelization-pfp.jpg";
 import { useState } from "react";
 import { toast } from "sonner";
 
