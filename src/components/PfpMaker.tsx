@@ -92,10 +92,10 @@ const PfpMaker = () => {
     <section id="pfp" className="py-20 px-4">
       <div className="max-w-2xl mx-auto text-center">
         <h2 className="font-screen text-3xl md:text-4xl text-primary mb-3">
-          PFP MAKER
+          PIXELIZER
         </h2>
         <p className="font-pixel text-muted-foreground text-sm mb-8">
-          Upload your image. AI will transform it into pixel art. Join the movement.
+          Upload your image. AI will pixelize it. Join the movement.
         </p>
 
         <div className="bg-card pixel-border p-6 md:p-8">
